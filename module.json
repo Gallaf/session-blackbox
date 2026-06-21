@@ -1,0 +1,18 @@
+{
+  "id": "session-blackbox",
+  "title": "Session Blackbox",
+  "description": "Lightweight in-memory chat capture for Foundry VTT sessions.",
+  "version": "0.1.0",
+  "authors": [
+    {
+      "name": "Marcelo"
+    }
+  ],
+  "compatibility": {
+    "minimum": "13",
+    "verified": "14"
+  },
+  "esmodules": [
+    "scripts/session-blackbox.js"
+  ]
+}
