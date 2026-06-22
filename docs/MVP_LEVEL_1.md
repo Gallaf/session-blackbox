@@ -221,3 +221,32 @@ Expected result:
 - Session Blackbox captures the message before cleanup;
 - cleanup can remove the visible chat message later;
 - the compact buffer entry remains available for debug inspection.
+
+## Resultado do teste manual - MVP Level 1
+
+Data: 2026-06-21
+
+Ambiente validado:
+- Foundry VTT local/dev usando C:/FoundryDataDev.
+- Sistema D&D 5e carregado no mundo de teste.
+- Modulo session-blackbox instalado via junction em C:/FoundryDataDev/Data/modules/session-blackbox.
+
+Validacoes realizadas:
+- O modulo apareceu na lista de modulos do Foundry.
+- O modulo pode ser ativado no mundo.
+- A API SessionBlackbox ficou disponivel no console do GM.
+- SessionBlackbox.clear() limpou o buffer em memoria.
+- SessionBlackbox.size() refletiu corretamente a quantidade de registros capturados.
+- SessionBlackbox.getLast() retornou o ultimo registro compacto.
+- Mensagem comum foi capturada com content preenchido e rolls vazio.
+- Rolagens foram capturadas com registros em rolls.
+- Whisper foi capturado sem salvar content nem flavor, com contentOmitted true.
+- Blind roll foi capturado sem salvar content nem flavor, com contentOmitted true.
+- Apos deletar mensagens do Foundry com ChatMessage.deleteDocuments(ids), o buffer do Session Blackbox continuou preservando os registros compactos capturados.
+
+Resultado:
+- MVP Level 1 aprovado.
+- A tese central foi validada: a ChatMessage nasce, o Session Blackbox captura uma copia compacta via createChatMessage, e a copia permanece no buffer mesmo que a mensagem seja removida depois do chat.
+
+Observacao:
+- O Chat Cleaner foi instalado para teste exploratorio, mas seu comportamento de limpeza no Foundry v14 nao foi considerado criterio de aceite do MVP. O teste conceitual com ChatMessage.deleteDocuments(ids) cobre o comportamento essencial esperado de uma limpeza posterior.
