@@ -8,11 +8,15 @@ and make future post-session export and analysis possible.
 
 ## Status
 
-Experimental / MVP planning.
+Experimental.
 
-This repository currently contains only the project documentation. It does not
-yet contain a Foundry manifest, scripts, settings, UI, build step, package
-manager setup, or export feature.
+MVP Level 1 has been implemented, manually tested, and validated in Foundry VTT.
+
+The current repository contains:
+
+- Foundry VTT module manifest: `module.json`.
+- Main module script: `scripts/session-blackbox.js`.
+- Documentation for project context and MVP scope.
 
 ## Goal
 
@@ -26,46 +30,35 @@ narrative analysis, and post-game review.
 The AI analysis does not happen inside Foundry. During play, this module should
 only observe, copy compact data, and stay out of the way.
 
-## What The Module Should Do
+## What Exists Now
 
-- Capture newly created `ChatMessage` documents through `createChatMessage`.
-- Run capture only on the GM client in the initial MVP to avoid duplication.
-- Store a compact in-memory representation of messages and rolls.
-- Omit private content by default for whispers, blind rolls, and private
-  messages.
-- Keep the implementation small, transparent, and easy to inspect.
-- Prioritize performance and privacy over features.
+- Captures newly created `ChatMessage` documents through the
+  `createChatMessage` hook.
+- Runs capture only on the GM client to avoid duplicate records.
+- Stores compact message and roll records in an in-memory buffer.
+- Keeps the implementation small, transparent, and easy to inspect.
+- Exposes a debug API at `globalThis.SessionBlackbox`:
+  - `size()`
+  - `getLast()`
+  - `getBuffer()`
+  - `clear()`
 
-## What The Module Should Not Do
+## Privacy Policy
 
-- Call AI services.
-- Call external network services.
-- Export automatically.
-- Capture private message content without explicit configuration.
-- Store complete `ChatMessage` objects.
-- Deep-clone large `flags` objects.
-- Parse rendered chat HTML or DOM inside hooks.
-- Perform heavy work while Foundry is processing chat messages or rolls.
+- Whispers, blind rolls, and private messages do not store `content` or
+  `flavor` by default.
+- The module does not send data to AI services.
+- The module does not send data to external networks or external services.
 
-## Future Local Installation
+## Not Implemented Yet
 
-The intended local development setup is:
-
-- Foundry dev data path: `C:/FoundryDataDev`
-- Preferred repository path: `C:/Repos/session-blackbox`
-- Expected module path: `C:/FoundryDataDev/Data/modules/session-blackbox`
-
-The expected strategy is to create a junction from the Foundry module directory
-to the repository:
-
-```powershell
-New-Item -ItemType Junction `
-  -Path "C:/FoundryDataDev/Data/modules/session-blackbox" `
-  -Target "C:/Repos/session-blackbox"
-```
-
-This is documented for future use only. The current repository intentionally
-does not include `module.json` yet.
+- JSONL export.
+- UI.
+- `game.settings`.
+- IndexedDB.
+- Persistence between reloads.
+- Chat cleanup.
+- AI analysis inside Foundry.
 
 ## Documentation
 
