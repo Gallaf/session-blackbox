@@ -5,6 +5,7 @@ const SLOW_CAPTURE_MS = 2;
 const PRIVATE_ROLL_MODES = new Set(["blindroll", "gmroll", "selfroll"]);
 
 const buffer = [];
+const seenIds = new Set();
 
 function debug(...args) {
   if (DEBUG) {
@@ -30,6 +31,10 @@ function asArray(value) {
 
 function getId(document) {
   return document?.id ?? document?._id ?? null;
+}
+
+function getMessageIdentifier(message) {
+  return getId(message) ?? message?.uuid ?? null;
 }
 
 function getUserId(user) {
@@ -94,7 +99,7 @@ function compactRoll(roll, index) {
   };
 }
 
-function compactMessage(message, creatingUserId) {
+function compactMessage(message, creatingUserId, source = "createChatMessage") {
   const timestamp = message?.timestamp ?? null;
   const speaker = message?.speaker ?? {};
   const rollMode = getRollMode(message);
@@ -105,7 +110,7 @@ function compactMessage(message, creatingUserId) {
 
   return {
     schemaVersion: 1,
-    source: "createChatMessage",
+    source,
     id: getId(message),
     uuid: message?.uuid ?? null,
     timestamp,
@@ -138,8 +143,27 @@ function compactMessage(message, creatingUserId) {
 function trimBuffer() {
   const overflow = buffer.length - MAX_BUFFER_SIZE;
   if (overflow > 0) {
-    buffer.splice(0, overflow);
+    const removedEntries = buffer.splice(0, overflow);
+
+    for (const entry of removedEntries) {
+      const identifier = getMessageIdentifier(entry);
+
+      if (identifier) {
+        seenIds.delete(identifier);
+      }
+    }
   }
+}
+
+function appendEntry(entry) {
+  const identifier = getMessageIdentifier(entry);
+
+  if (identifier) {
+    seenIds.add(identifier);
+  }
+
+  buffer.push(entry);
+  trimBuffer();
 }
 
 function onCreateChatMessage(message, options, userId) {
@@ -151,9 +175,15 @@ function onCreateChatMessage(message, options, userId) {
       return;
     }
 
+    const identifier = getMessageIdentifier(message);
+
+    if (identifier && seenIds.has(identifier)) {
+      debug("Skipping duplicate chat message capture", { id: identifier });
+      return;
+    }
+
     const entry = compactMessage(message, userId);
-    buffer.push(entry);
-    trimBuffer();
+    appendEntry(entry);
     debug("Captured chat message", { id: entry.id, size: buffer.length });
   } catch (error) {
     console.warn(`[${MODULE_ID}] Failed to capture chat message.`, error);
@@ -163,6 +193,33 @@ function onCreateChatMessage(message, options, userId) {
     if (elapsedMs > SLOW_CAPTURE_MS) {
       console.warn(`[${MODULE_ID}] Chat message capture took ${elapsedMs.toFixed(2)}ms.`);
     }
+  }
+}
+
+function onPreDeleteChatMessage(message) {
+  try {
+    if (!globalThis.game?.user?.isGM) {
+      debug("Skipping pre-delete capture because this client is not GM.");
+      return;
+    }
+
+    const identifier = getMessageIdentifier(message);
+
+    if (!identifier) {
+      debug("Skipping pre-delete fallback because message has no stable identifier.");
+      return;
+    }
+
+    if (seenIds.has(identifier)) {
+      debug("Skipping duplicate pre-delete fallback", { id: identifier });
+      return;
+    }
+
+    const entry = compactMessage(message, null, "preDeleteChatMessage");
+    appendEntry(entry);
+    debug("Captured pre-delete fallback chat message", { id: entry.id, size: buffer.length });
+  } catch (error) {
+    console.warn(`[${MODULE_ID}] Failed to capture pre-delete chat message fallback.`, error);
   }
 }
 
@@ -179,6 +236,7 @@ function exposeDebugApi() {
     },
     clear() {
       buffer.length = 0;
+      seenIds.clear();
     }
   });
 }
@@ -191,5 +249,6 @@ Hooks.once("ready", () => {
 
   exposeDebugApi();
   Hooks.on("createChatMessage", onCreateChatMessage);
-  debug("GM chat capture hook registered.");
+  Hooks.on("preDeleteChatMessage", onPreDeleteChatMessage);
+  debug("GM chat capture hooks registered.");
 });
