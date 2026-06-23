@@ -1,11 +1,13 @@
 const MODULE_ID = "session-blackbox";
 const DEBUG = true;
-const MAX_BUFFER_SIZE = 5000;
+const MAX_BUFFER_ENTRIES = 10000;
 const SLOW_CAPTURE_MS = 2;
 const PRIVATE_ROLL_MODES = new Set(["blindroll", "gmroll", "selfroll"]);
 
 const buffer = [];
 const seenIds = new Set();
+let totalCaptured = 0;
+let droppedEntries = 0;
 
 function debug(...args) {
   if (DEBUG) {
@@ -141,17 +143,10 @@ function compactMessage(message, creatingUserId, source = "createChatMessage") {
 }
 
 function trimBuffer() {
-  const overflow = buffer.length - MAX_BUFFER_SIZE;
+  const overflow = buffer.length - MAX_BUFFER_ENTRIES;
   if (overflow > 0) {
-    const removedEntries = buffer.splice(0, overflow);
-
-    for (const entry of removedEntries) {
-      const identifier = getMessageIdentifier(entry);
-
-      if (identifier) {
-        seenIds.delete(identifier);
-      }
-    }
+    buffer.splice(0, overflow);
+    droppedEntries += overflow;
   }
 }
 
@@ -163,7 +158,38 @@ function appendEntry(entry) {
   }
 
   buffer.push(entry);
+  totalCaptured += 1;
   trimBuffer();
+}
+
+function toJsonl() {
+  return buffer.map((entry) => JSON.stringify(entry)).join("\n");
+}
+
+function roundToTwoDecimals(value) {
+  return Math.round(value * 100) / 100;
+}
+
+function getJsonlByteLength(jsonl) {
+  return new TextEncoder().encode(jsonl).length;
+}
+
+function getStats() {
+  const size = buffer.length;
+  const jsonlBytes = getJsonlByteLength(toJsonl());
+  const avgBytesPerEntry = size > 0 ? jsonlBytes / size : 0;
+
+  return {
+    size,
+    maxEntries: MAX_BUFFER_ENTRIES,
+    totalCaptured,
+    droppedEntries,
+    jsonlBytes,
+    jsonlKB: roundToTwoDecimals(jsonlBytes / 1024),
+    jsonlMB: roundToTwoDecimals(jsonlBytes / 1024 / 1024),
+    avgBytesPerEntry,
+    avgKBPerEntry: size > 0 ? roundToTwoDecimals(avgBytesPerEntry / 1024) : 0
+  };
 }
 
 function onCreateChatMessage(message, options, userId) {
@@ -234,9 +260,15 @@ function exposeDebugApi() {
     getBuffer() {
       return cloneValue(buffer);
     },
+    toJsonl,
+    stats() {
+      return getStats();
+    },
     clear() {
       buffer.length = 0;
       seenIds.clear();
+      totalCaptured = 0;
+      droppedEntries = 0;
     }
   });
 }
